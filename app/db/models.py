@@ -1,6 +1,6 @@
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, func
-from database import Base
+from app.db.database import Base
 
 class Note(Base):
     __tablename__ = "notes"
