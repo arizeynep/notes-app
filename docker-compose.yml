@@ -1,11 +1,30 @@
-version: "3.8"
+version: "3.9"
+
 services:
-  web:
-    build: .
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile     # root-level backend Dockerfile
+    container_name: notes-backend
     ports:
       - "8000:8000"
-    volumes:
-      - data:/data
-      - ./:/app
-volumes:
-  data:
+    networks:
+      - notes-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "http://backend:8000"
+    container_name: notes-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - notes-net
+
+networks:
+  notes-net:
+    driver: bridge
