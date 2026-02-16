@@ -1,30 +1,49 @@
 <template>
-  <div class="container">
-    <h1>Notes</h1>
+  <div class="container" @mouseup="stopResize" @mousemove="resize" @mouseleave="stopResize">
 
-    <!--@submit.prevent - When you click "Add note", it prevents the page from reloading and calls the createNote() function -->
-    <!-- v-model - Two-way binding (whatever you type in the input box gets saved to newTitle and newContent) -->
-    <form @submit.prevent="createNote">
-      <input v-model="newTitle" placeholder="Title" required />
-      <input v-model="newContent" placeholder="Content" />
-      <button type="submit">Add note</button>
-    </form>
-
-    <ul>
-      <li v-for="n in notes" :key="n.id">
-        <strong>{{ n.title }}</strong> — {{ n.content }}
-        <button @click="deleteNote(n.id)">Delete</button>
-        <button @click="startEdit(n)">Edit</button>
-      </li>
-    </ul>
-
-    <div v-if="editing">
-      <h3>Edit</h3>
-      <input v-model="editTitle" />
-      <input v-model="editContent" />
-      <button @click="updateNote">Save</button>
-      <button @click="cancelEdit">Cancel</button>
+    <div class="left" ref="leftPanel" :style="{ width: leftWidth + '%' }">
+      <div class="notes-header">
+        <h1>Notes</h1>
+        <button class="new-btn" @click="createNote">+ New</button>
+      </div>
+      <div class="notes-list" v-for="n in notes" :key="n.id">
+        <div class="note-item">
+          <button class="start-edit" @click="startEdit(n)">{{n.title}}</button>
+          <button class="delete-note" @click="deleteNote(n.id)">Delete</button>
+        </div>
+      </div>
     </div>
+
+    <div class="divider" @mousedown="startResize"></div>
+
+    <div class="right" ref="rightPanel" :style="{ width: rightWidth + '%' }">
+      <div v-if="adding" class="adding-wrapper">
+        <form class="note-form" @submit.prevent="createNote">
+          <div class="notes-content">
+            <input class="title-input" v-model="newTitle" placeholder="Title" />
+            <textarea class="content-input" v-model="newContent" placeholder="Content"></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary">Add note</button>
+            <button type="button" @click="cancelAdding">Cancel</button>
+          </div>
+        </form>
+      </div>
+      <div v-if="editing">
+          <form class="edit-note-form" @submit.prevent="startEdit">
+          <div class="edit-notes-content">
+            <input class="edit-title-input" v-model="editTitle"/>
+            <textarea class="edit-content-input" v-model="editContent"></textarea>
+          </div>
+          <div class="edit-form-actions">
+            <button type="submit" class="primary" @click="updateNote">Save</button>
+            <button type="button" @click="cancelEdit">Cancel</button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -38,10 +57,14 @@ export default {
       notes: [],
       newTitle: '',
       newContent: '',
+      adding: false,
       editing: false,
       editId: null,
       editTitle: '',
-      editContent: ''
+      editContent: '',
+      isResizing: false,
+      leftWidth: 50,
+      rightWidth: 50
     }
   },
 
@@ -60,6 +83,7 @@ export default {
     },
 
     async createNote() {
+      this.adding = true;
       if (!this.newTitle) return
       const res = await fetch(`${API}/notes`, {
         method: 'POST',
@@ -71,6 +95,7 @@ export default {
       if (res.ok) {
         this.newTitle = ''
         this.newContent = ''
+        this.cancelAdding()
         await this.fetchNotes()
       } else {
         alert('Failed to create note')
@@ -96,6 +121,12 @@ export default {
       this.editId = null
     },
 
+    cancelAdding() {
+      this.adding = false
+      this.editId = null
+    },
+
+
     async updateNote() {
       const res = await fetch(`${API}/notes/${this.editId}`, {
         method: 'PUT',
@@ -109,13 +140,26 @@ export default {
       } else {
         alert('Update failed')
       }
+    },
+
+    startResize() {
+      this.isResizing = true
+    },
+
+    stopResize() {
+      this.isResizing = false
+    },
+
+    resize(e) {
+      if (!this.isResizing) return
+      const container = e.currentTarget
+      const newLeftWidth = (e.clientX / container.clientWidth) * 100
+      if (newLeftWidth > 20 && newLeftWidth < 80) {
+        this.leftWidth = newLeftWidth
+        this.rightWidth = 100 - newLeftWidth
+      }
     }
   }
 }
 </script>
 
-<style>
-.container { max-width: 600px; margin: 2rem auto; font-family: sans-serif; }
-input { margin: .25rem; padding: .25rem; }
-button { margin-left: .25rem; }
-</style>
