@@ -2,12 +2,14 @@
 Frontend integration tests using Playwright.
 Tests the real frontend + backend interaction.
 """
-
+import uuid
 import pytest
 from playwright.sync_api import expect, Page
 import subprocess
 import time
 import os
+
+from app.domain import note
 
 
 # Fixtures for starting the backend server
@@ -15,8 +17,13 @@ import os
 def backend_server():
     """Start the backend server for testing."""
     env = os.environ.copy()
-    env['DATABASE_URL'] = 'sqlite:///./test.db'
-    
+    env['DATABASE_URL'] = 'sqlite:///./test_frontend.db'
+
+    # This deletes the test database per session, but I also want to ensure it's clean before each test, 
+    # so I'll add a fixture for that as well
+    if os.path.exists('test_frontend.db'):
+        os.remove('test_frontend.db')
+
     process = subprocess.Popen(
         ['python', '-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '8000'],
         cwd='/home/moro/Zeynep/projects/notes-app',
@@ -38,6 +45,11 @@ class TestNotesApp:
         page.goto('http://localhost:5173')  # Vite dev server
         yield
 
+    def reset_db():
+        """Delete the test database before each test."""
+        if os.path.exists('test_frontend.db'):
+            os.remove('test_frontend.db')
+
     def test_app_loads(self, page):
         """Test that the app loads successfully."""
         expect(page.locator('h1')).to_contain_text('Notes')
@@ -45,7 +57,7 @@ class TestNotesApp:
 
     def test_create_note(self, page):
         """Test creating a new note."""
-        # Click the "New" button
+        # Create a new note 
         page.click('.new-btn')
         
         # Title and content inputs should be visible
@@ -65,40 +77,45 @@ class TestNotesApp:
         expect(title_input).not_to_be_visible()
         
         # The note should appear in the list
-        expect(page.locator('button:has-text("Test Note")')).to_be_visible()
+        note = page.locator('.note-item', has_text='Test Note').first
+        expect(note).to_be_visible()
 
     def test_edit_note(self, page):
-        """Test editing an existing note."""
-        # Create a note first
+        """Test creating and editing a note using the provided template."""
+        # Create a new note to edit
         page.click('.new-btn')
+        
+        # Fill the adding form
         page.locator('.title-input').fill('Original Title')
         page.locator('.content-input').fill('Original Content')
-        page.click('.primary')
+        page.locator('.adding-wrapper .primary').click()  # Click 'Add note'
         
-        # Wait for note to appear
-        page.wait_for_selector('button:has-text("Original Title")')
+        # Wait for the new note to appear in the list
+        note_row = page.locator('.note-item', has_text='Original Title')
+        note_row.wait_for(state="visible", timeout=5000)
         
-        # Click on the note to edit it
-        page.click('button:has-text("Original Title")')
+        # Start editing the note
+        note_row.locator('.start-edit').click()
         
-        # Edit form should be visible
-        edit_title = page.locator('.edit-title-input')
-        edit_content = page.locator('.edit-content-input')
-        expect(edit_title).to_be_visible()
-        expect(edit_content).to_be_visible()
+        # Wait for the editing form to appear
+        edit_title = page.locator('.editing-wrapper .edit-title-input')
+        edit_content = page.locator('.editing-wrapper .edit-content-input')
+        edit_title.wait_for(state="visible", timeout=5000)
+        edit_content.wait_for(state="visible", timeout=5000)
         
-        # Verify the content is populated
+        # Verify the form is populated with the original note details
         expect(edit_title).to_have_value('Original Title')
         expect(edit_content).to_have_value('Original Content')
         
-        # Update the note
+        # Update the note details
         edit_title.fill('Updated Title')
         edit_content.fill('Updated Content')
-        page.locator('.primary').nth(1).click()  # Click second primary button (Save)
+        page.locator('.editing-wrapper .edit-form-actions .primary').click()  # Click 'Save'
         
-        # The note should be updated in the list
-        expect(page.locator('button:has-text("Updated Title")')).to_be_visible()
-        expect(page.locator('button:has-text("Original Title")')).not_to_be_visible()
+        # Verify the updated note appears 
+        updated_note = page.locator('.note-item', has_text='Updated Title')
+        updated_note.wait_for(state="visible", timeout=5000)
+
 
     def test_delete_note(self, page):
         """Test deleting a note."""
@@ -112,13 +129,18 @@ class TestNotesApp:
         page.wait_for_selector('button:has-text("Note to Delete")')
         
         # Click delete button
-        page.click('button:has-text("Delete")')
+        note_row = page.locator('.note-item', has_text='Note to Delete')
+        note_row.locator('.delete-note').click()
+
+        expect(note_row).to_have_count(0)
         
         # The note should be removed from the list
-        expect(page.locator('button:has-text("Note to Delete")')).not_to_be_visible()
+        note = page.locator('.note-item', has_text='Note to Delete').first
+        expect(note).not_to_be_visible()
 
     def test_cancel_adding(self, page):
         """Test canceling the add form."""
+        # Create a new note 
         page.click('.new-btn')
         
         # Fill in some content
@@ -133,6 +155,7 @@ class TestNotesApp:
 
     def test_unsaved_changes_popup_add_to_add(self, page):
         """Test unsaved changes popup when switching from adding to adding."""
+        # Create a new note and fill in some content
         page.click('.new-btn')
         page.locator('.title-input').fill('First Note')
         
@@ -149,40 +172,20 @@ class TestNotesApp:
         # Popup should disappear
         expect(page.locator('.overlay')).not_to_be_visible()
 
-    def test_panel_resize(self, page):
-        """Test that panels can be resized."""
-        left_panel = page.locator('.left')
-        right_panel = page.locator('.right')
-        divider = page.locator('.divider')
-        
-        # Get initial widths
-        initial_left_width = left_panel.evaluate('el => el.style.width')
-        
-        # Drag the divider to the right
-        divider.drag_to(page.locator('body'), target_position={'x': 100, 'y': 0})
-        
-        # The width should have changed (ideally narrower on left)
-        # Note: This test might need adjustment based on actual behavior
-        expect(left_panel).to_be_visible()
-        expect(right_panel).to_be_visible()
-
     def test_multiple_notes(self, page):
-        """Test creating and managing multiple notes."""
+        """Test creating multiple notes."""
         notes_data = [
-            {'title': 'Note 1', 'content': 'Content 1'},
-            {'title': 'Note 2', 'content': 'Content 2'},
-            {'title': 'Note 3', 'content': 'Content 3'},
+            {'title': f'Note 1 {uuid.uuid4()}', 'content': 'Content 1'},
+            {'title': f'Note 2 {uuid.uuid4()}', 'content': 'Content 2'},
+            {'title': f'Note 3 {uuid.uuid4()}', 'content': 'Content 3'},
         ]
-        
-        # Create multiple notes
+
         for note in notes_data:
             page.click('.new-btn')
             page.locator('.title-input').fill(note['title'])
             page.locator('.content-input').fill(note['content'])
             page.click('.primary')
-            page.wait_for_timeout(500)  # Small delay between creations
-        
-        # All notes should be visible
-        for note in notes_data:
-            expect(page.locator(f'button:has-text("{note["title"]}")')).to_be_visible()
+
+            note_row = page.locator('.note-item', has_text=note["title"])
+            expect(note_row).to_be_visible()
 

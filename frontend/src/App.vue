@@ -7,8 +7,8 @@
         <h1>Notes</h1>
         <button class="new-btn" @click="createNote">+ New</button>
       </div>
-      <div class="notes-list" v-for="n in notes" :key="n.id">
-        <div class="note-item">
+      <div class="notes-list">
+        <div class="note-item" v-for="n in notes" :key="n.id">
           <button class="start-edit" @click="startEdit(n)">{{n.title}}</button>
           <button class="delete-note" @click="deleteNote(n.id)">Delete</button>
         </div>
@@ -21,7 +21,7 @@
     <!-- RIGHT PANEL -->
     <div class="right" ref="rightPanel" :style="{ width: rightWidth + '%' }">
       <!-- Show this form when adding a new note -->
-      <div v-if="adding && showPopup != 2 || showPopup == 0" class="adding-wrapper">
+      <div v-if="adding && (showPopup != 2 || showPopup == 0)" class="adding-wrapper">
         <form class="note-form" @submit.prevent="createNote">
           <div class="notes-content">
             <input class="title-input" v-model="newTitle" placeholder="Title" />
@@ -35,7 +35,7 @@
       </div>
 
       <!-- Show this form when editing an existing note -->
-      <div v-if="editing && showPopup != 3 || showPopup == 1" class="editing-wrapper">
+      <div v-if="editing && (showPopup != 3 || showPopup == 1)" class="editing-wrapper">
           <form class="edit-note-form" @submit.prevent="startEdit">
           <div class="edit-notes-content">
             <input class="edit-title-input" v-model="editTitle"/>
