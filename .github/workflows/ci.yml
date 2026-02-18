@@ -36,4 +36,4 @@ jobs:
 
       # 6. Run frontend tests
       - name: Run frontend tests
-        run: pytest tests/test_frontend.py --headless
+        run: pytest tests/test_frontend.py
