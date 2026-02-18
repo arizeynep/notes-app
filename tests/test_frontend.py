@@ -24,11 +24,13 @@ def backend_server():
     if os.path.exists('test_frontend.db'):
         os.remove('test_frontend.db')
 
+    project_root = os.path.dirname(os.path.dirname(__file__))  # parent of tests/
     process = subprocess.Popen(
         ['python', '-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', '8000'],
-        cwd='/home/moro/Zeynep/projects/notes-app',
+        cwd=project_root,
         env=env
     )
+
     time.sleep(2)  # Wait for server to start
     yield process
     process.terminate()
