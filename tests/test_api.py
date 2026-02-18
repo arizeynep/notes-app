@@ -1,14 +1,17 @@
 
 from fastapi.testclient import TestClient
 from main import app
+import pytest
 
 client = TestClient(app)
 
+@pytest.mark.backend
 def test_health():
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
 
+@pytest.mark.backend
 def test_crud_notes():
     r = client.post("/notes", json={"title": "Test", "content": "abc"})
     assert r.status_code == 201
