@@ -29,11 +29,33 @@ jobs:
       # 4. Install Playwright browsers
       - name: Install Playwright browsers
         run: playwright install
+    
+      # 5. Build and serve frontend
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
 
-      # 5. Run backend tests
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build and serve frontend
+        run: 
+          npm run build
+          npx serve -s dist -l 5173 &
+
+      # 6. Start backend server
+      - name: Start backend
+        run: python -m uvicorn main:app --host 127.0.0.1 --port 8000 &
+
+      # 7. Wait until both servers are up 
+      - name: Wait for servers
+        run: sleep 5  
+
+      # 8. Run backend tests
       - name: Run backend tests
         run: pytest tests/test_backend.py
-
-      # 6. Run frontend tests
+          
+      # 9. Run frontend tests
       - name: Run frontend tests
         run: pytest tests/test_frontend.py
